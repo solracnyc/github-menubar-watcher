@@ -52,6 +52,9 @@ class ReleaseWatcherApp(rumps.App):
             self._repo_items[key] = {"item": item, "label": label, "config": repo_cfg}
             self.menu.add(item)
 
+        self._status_item = rumps.MenuItem("Last check: OK", callback=None)
+        self.menu.add(self._status_item)
+
         self.menu.add(rumps.separator)
         self.menu.add(rumps.MenuItem("Check Now", callback=self._check_now))
         self.menu.add(rumps.MenuItem("Open Config", callback=self._open_config))
@@ -64,6 +67,11 @@ class ReleaseWatcherApp(rumps.App):
         # Initial check in background
         self._run_check_async()
 
+        # Set up periodic check timer using config interval
+        interval = self.config.get("check_interval_minutes", 60) * 60
+        self._timer = rumps.Timer(self._hourly_check, interval)
+        self._timer.start()
+
     def _version_display(self, state: dict | None, watch_type: str) -> str:
         if state is None:
             return "checking..."
@@ -71,7 +79,6 @@ class ReleaseWatcherApp(rumps.App):
             return state.get("last_tag_name", "unknown")
         return state.get("last_tag_name", "unknown")
 
-    @rumps.timer(3600)  # 3600 seconds = 1 hour
     def _hourly_check(self, _):
         self._run_check_async()
 
@@ -100,14 +107,17 @@ class ReleaseWatcherApp(rumps.App):
                 any_error = True
                 self._error_message = str(e)
 
-        # Update icon on main thread
+        # Update icon and status item on main thread
         if any_error:
             self.icon = ICON_RED
+            self._status_item.title = self._error_message or "Error checking repos"
         elif any_new or self.has_new:
             self.has_new = True
             self.icon = ICON_HIGHLIGHT
+            self._status_item.title = "Last check: OK"
         else:
             self.icon = ICON_GRAY
+            self._status_item.title = "Last check: OK"
 
     def _check_repo(self, key: str, cfg: dict) -> str:
         """Check a single repo. Returns 'new', 'unchanged', or 'baseline'."""
