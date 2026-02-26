@@ -43,6 +43,7 @@ class ReleaseWatcherApp(rumps.App):
         self.has_new = False
         self._error_message = None
         self._check_lock = threading.Lock()
+        self._flash_generation = 0
 
         # Build menu
         self._repo_items = {}
@@ -235,6 +236,12 @@ class ReleaseWatcherApp(rumps.App):
         if self.has_new:
             return ICON_HIGHLIGHT
         return ICON_GRAY
+
+    def _end_flash(self, generation):
+        """Revert icon after flash. No-op if generation is stale."""
+        if generation != self._flash_generation:
+            return
+        self.icon = self._current_state_icon()
 
     def _copy_version(self, sender):
         """Copy version string to clipboard when a repo menu item is clicked."""
