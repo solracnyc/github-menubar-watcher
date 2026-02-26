@@ -1,0 +1,17 @@
+{
+  "check_interval_minutes": 60,
+  "repos": [
+    {
+      "owner": "cloudflare",
+      "repo": "vinext",
+      "watch": "tags",
+      "label": "Vinext"
+    },
+    {
+      "owner": "soniox",
+      "repo": "soniox-js",
+      "watch": "releases",
+      "label": "Soniox JS"
+    }
+  ]
+}
