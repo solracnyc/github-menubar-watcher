@@ -22,6 +22,7 @@ STATE_PATH = os.path.join(_DIR, "state.json")
 ICON_GRAY = os.path.join(_DIR, "icons", "icon-gray.png")
 ICON_HIGHLIGHT = os.path.join(_DIR, "icons", "icon-highlight.png")
 ICON_RED = os.path.join(_DIR, "icons", "icon-red.png")
+ICON_GREEN = os.path.join(_DIR, "icons", "icon-green.png")
 
 
 class ReleaseWatcherApp(rumps.App):
@@ -201,15 +202,16 @@ class ReleaseWatcherApp(rumps.App):
         # Update icon and status
         any_new = any(u["status"] == "new" for u in ui_updates)
         if any_error:
-            self.icon = ICON_RED
+            self._error_message = error_message
             self._status_item.title = error_message or "Error checking repos"
         elif any_new or self.has_new:
             self.has_new = True
-            self.icon = ICON_HIGHLIGHT
+            self._error_message = None
             self._status_item.title = "Last check: OK"
         else:
-            self.icon = ICON_GRAY
+            self._error_message = None
             self._status_item.title = "Last check: OK"
+        self.icon = self._current_state_icon()
 
     def _tag_changed(self, key: str, result: dict) -> bool:
         prev = self.state.get(key)
@@ -225,6 +227,14 @@ class ReleaseWatcherApp(rumps.App):
         if prev is None:
             return True
         return prev.get("last_release_id") != result["release_id"]
+
+    def _current_state_icon(self):
+        """Return the correct icon path for the current app state."""
+        if self._error_message:
+            return ICON_RED
+        if self.has_new:
+            return ICON_HIGHLIGHT
+        return ICON_GRAY
 
     def _copy_version(self, sender):
         """Copy version string to clipboard when a repo menu item is clicked."""
@@ -243,7 +253,7 @@ class ReleaseWatcherApp(rumps.App):
         # Reset icon if no more NEW items
         if not any("(NEW)" in i["item"].title for i in self._repo_items.values()):
             self.has_new = False
-            self.icon = ICON_GRAY
+            self.icon = self._current_state_icon()
 
     def _check_now(self, _):
         self._run_check_async()
