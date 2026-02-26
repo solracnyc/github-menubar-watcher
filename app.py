@@ -54,7 +54,12 @@ class ReleaseWatcherApp(rumps.App):
             self._repo_items[key] = {"item": item, "label": label, "config": repo_cfg}
             self.menu.add(item)
 
-        self._status_item = rumps.MenuItem("Last check: OK", callback=None)
+        if self.state.corruption_warning:
+            self._status_item = rumps.MenuItem(
+                f"⚠ {self.state.corruption_warning}", callback=None
+            )
+        else:
+            self._status_item = rumps.MenuItem("Last check: OK", callback=None)
         self.menu.add(self._status_item)
 
         self.menu.add(rumps.separator)

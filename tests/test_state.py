@@ -66,3 +66,34 @@ def test_state_survives_reload(tmp_path):
     store2 = StateStore(str(p))
     assert store2.get("test/repo")["version"] == "v1.0"
     assert store2.get_etag("test/repo") == '"e"'
+
+
+def test_corrupted_json_loads_as_empty(tmp_path):
+    """Corrupted state.json should result in empty state, not a crash."""
+    p = tmp_path / "state.json"
+    p.write_text("{this is not valid json!!!")
+    store = StateStore(str(p))
+    assert store.data == {}
+    assert store.corruption_warning is not None
+    assert "JSONDecodeError" in store.corruption_warning
+
+
+def test_corrupted_file_is_renamed(tmp_path):
+    """Corrupted file should be renamed for forensics."""
+    p = tmp_path / "state.json"
+    p.write_text("corrupt data")
+    store = StateStore(str(p))
+    assert not p.exists(), "Original corrupt file should have been renamed"
+    corrupt_files = list(tmp_path.glob("state.json.corrupt-*"))
+    assert len(corrupt_files) == 1
+    assert corrupt_files[0].read_text() == "corrupt data"
+    assert store.data == {}
+
+
+def test_no_corruption_warning_on_valid_state(tmp_path):
+    """Valid state.json should not trigger corruption warning."""
+    p = tmp_path / "state.json"
+    p.write_text(json.dumps({"test/repo": {"version": "v1.0"}}))
+    store = StateStore(str(p))
+    assert store.corruption_warning is None
+    assert store.data["test/repo"]["version"] == "v1.0"

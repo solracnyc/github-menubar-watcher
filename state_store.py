@@ -10,9 +10,24 @@ class StateStore:
     def __init__(self, path: str):
         self.path = path
         self.data: dict = {}
+        self.corruption_warning: str | None = None
         if os.path.isfile(path):
-            with open(path) as f:
-                self.data = json.load(f)
+            try:
+                with open(path) as f:
+                    self.data = json.load(f)
+            except (json.JSONDecodeError, OSError) as e:
+                # Rename corrupted file for forensics, start fresh
+                ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+                corrupt_path = f"{path}.corrupt-{ts}"
+                try:
+                    os.rename(path, corrupt_path)
+                except OSError:
+                    pass  # Best effort rename
+                self.data = {}
+                self.corruption_warning = (
+                    f"State reset: {e.__class__.__name__} — "
+                    f"corrupt file saved as {os.path.basename(corrupt_path)}"
+                )
 
     def get(self, repo_key: str) -> dict | None:
         return self.data.get(repo_key)
