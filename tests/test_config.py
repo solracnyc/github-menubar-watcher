@@ -61,3 +61,42 @@ def test_load_config_defaults_interval(tmp_path):
     p.write_text(json.dumps(cfg))
     result = load_config(str(p))
     assert result["check_interval_minutes"] == 60
+
+
+def test_load_config_rejects_string_interval(tmp_path):
+    cfg = {
+        "check_interval_minutes": "sixty",
+        "repos": [
+            {"owner": "x", "repo": "y", "watch": "tags", "label": "Z"}
+        ],
+    }
+    p = tmp_path / "config.json"
+    p.write_text(json.dumps(cfg))
+    with pytest.raises(ConfigError, match="check_interval_minutes must be a number"):
+        load_config(str(p))
+
+
+def test_load_config_rejects_zero_interval(tmp_path):
+    cfg = {
+        "check_interval_minutes": 0,
+        "repos": [
+            {"owner": "x", "repo": "y", "watch": "tags", "label": "Z"}
+        ],
+    }
+    p = tmp_path / "config.json"
+    p.write_text(json.dumps(cfg))
+    with pytest.raises(ConfigError, match="check_interval_minutes must be a number"):
+        load_config(str(p))
+
+
+def test_load_config_rejects_negative_interval(tmp_path):
+    cfg = {
+        "check_interval_minutes": -5,
+        "repos": [
+            {"owner": "x", "repo": "y", "watch": "tags", "label": "Z"}
+        ],
+    }
+    p = tmp_path / "config.json"
+    p.write_text(json.dumps(cfg))
+    with pytest.raises(ConfigError, match="check_interval_minutes must be a number"):
+        load_config(str(p))

@@ -27,6 +27,12 @@ def load_config(path: str) -> dict:
 
     data.setdefault("check_interval_minutes", 60)
 
+    interval = data["check_interval_minutes"]
+    if not isinstance(interval, (int, float)) or interval < 1:
+        raise ConfigError(
+            "check_interval_minutes must be a number >= 1"
+        )
+
     for i, repo in enumerate(data["repos"]):
         missing = _REQUIRED_REPO_KEYS - set(repo.keys())
         if missing:

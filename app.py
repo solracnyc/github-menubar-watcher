@@ -7,6 +7,7 @@ import threading
 from datetime import datetime, timezone
 
 import rumps
+from PyObjCTools.AppHelper import callAfter
 
 from config_loader import load_config, ConfigError
 from github_client import GitHubClient, RateLimitError, GitHubAPIError
@@ -40,6 +41,7 @@ class ReleaseWatcherApp(rumps.App):
         self.client = GitHubClient(token=token)
         self.has_new = False
         self._error_message = None
+        self._check_lock = threading.Lock()
 
         # Build menu
         self._repo_items = {}
@@ -83,44 +85,47 @@ class ReleaseWatcherApp(rumps.App):
         self._run_check_async()
 
     def _run_check_async(self):
-        thread = threading.Thread(target=self._check_all, daemon=True)
+        if not self._check_lock.acquire(blocking=False):
+            return  # Already checking, skip this cycle
+        thread = threading.Thread(target=self._check_all_worker, daemon=True)
         thread.start()
 
-    def _check_all(self):
-        any_error = False
-        any_new = False
+    def _check_all_worker(self):
+        """Run API checks in background thread, dispatch UI updates to main thread."""
+        try:
+            ui_updates = []
+            notifications = []
+            any_error = False
+            error_message = None
 
-        for key, info in self._repo_items.items():
-            cfg = info["config"]
-            try:
-                result = self._check_repo(key, cfg)
-                if result == "new":
-                    any_new = True
-            except RateLimitError as e:
-                any_error = True
-                reset_time = ""
-                if e.reset_timestamp:
-                    dt = datetime.fromtimestamp(e.reset_timestamp, tz=timezone.utc)
-                    reset_time = f" — next check at {dt.strftime('%H:%M UTC')}"
-                self._error_message = f"Rate limited{reset_time}"
-            except (GitHubAPIError, Exception) as e:
-                any_error = True
-                self._error_message = str(e)
+            for key, info in self._repo_items.items():
+                cfg = info["config"]
+                try:
+                    result = self._check_repo(key, cfg)
+                    ui_updates.append(result)
+                    if result["status"] == "new":
+                        notifications.append(result)
+                except RateLimitError as e:
+                    any_error = True
+                    reset_time = ""
+                    if e.reset_timestamp:
+                        dt = datetime.fromtimestamp(e.reset_timestamp, tz=timezone.utc)
+                        reset_time = f" — next check at {dt.strftime('%H:%M UTC')}"
+                    error_message = f"Rate limited{reset_time}"
+                except (GitHubAPIError, Exception) as e:
+                    any_error = True
+                    error_message = str(e)
 
-        # Update icon and status item on main thread
-        if any_error:
-            self.icon = ICON_RED
-            self._status_item.title = self._error_message or "Error checking repos"
-        elif any_new or self.has_new:
-            self.has_new = True
-            self.icon = ICON_HIGHLIGHT
-            self._status_item.title = "Last check: OK"
-        else:
-            self.icon = ICON_GRAY
-            self._status_item.title = "Last check: OK"
+            # Dispatch all UI mutations to the main Cocoa thread
+            callAfter(
+                self._apply_check_results,
+                ui_updates, notifications, any_error, error_message,
+            )
+        finally:
+            self._check_lock.release()
 
-    def _check_repo(self, key: str, cfg: dict) -> str:
-        """Check a single repo. Returns 'new', 'unchanged', or 'baseline'."""
+    def _check_repo(self, key: str, cfg: dict) -> dict:
+        """Check a single repo. Returns a dict of results for UI update."""
         etag = self.state.get_etag(key)
         is_first = self.state.is_first_run(key)
 
@@ -130,7 +135,7 @@ class ReleaseWatcherApp(rumps.App):
             result = self.client.fetch_latest_release(cfg["owner"], cfg["repo"], etag=etag)
 
         if result is None:
-            return "unchanged"  # 304 or empty
+            return {"key": key, "status": "unchanged"}
 
         # Build state update
         if cfg["watch"] == "tags":
@@ -150,19 +155,56 @@ class ReleaseWatcherApp(rumps.App):
 
         self.state.update(key, new_state)
 
-        # Update menu item text
-        info = self._repo_items[key]
         version = result["tag_name"]
         if changed and not is_first:
-            info["item"].title = f"{info['label']}: {version} (NEW)"
-            send_notification(
-                info["label"],
-                f"New {'tag' if cfg['watch'] == 'tags' else 'release'}: {version}",
-            )
-            return "new"
+            return {
+                "key": key,
+                "status": "new",
+                "version": version,
+                "watch": cfg["watch"],
+            }
         else:
-            info["item"].title = f"{info['label']}: {version}"
-            return "baseline" if is_first else "unchanged"
+            return {
+                "key": key,
+                "status": "baseline" if is_first else "unchanged",
+                "version": version,
+            }
+
+    def _apply_check_results(self, ui_updates, notifications, any_error, error_message):
+        """Apply check results to UI. MUST run on the main thread."""
+        # Update menu item titles
+        for update in ui_updates:
+            key = update["key"]
+            if key not in self._repo_items:
+                continue
+            info = self._repo_items[key]
+            if "version" not in update:
+                continue
+            if update["status"] == "new":
+                info["item"].title = f"{info['label']}: {update['version']} (NEW)"
+            else:
+                info["item"].title = f"{info['label']}: {update['version']}"
+
+        # Send notifications (UNUserNotificationCenter is thread-safe, but
+        # doing it here keeps all side effects in one place)
+        for notif in notifications:
+            key = notif["key"]
+            info = self._repo_items[key]
+            watch_type = "tag" if notif["watch"] == "tags" else "release"
+            send_notification(info["label"], f"New {watch_type}: {notif['version']}")
+
+        # Update icon and status
+        any_new = any(u["status"] == "new" for u in ui_updates)
+        if any_error:
+            self.icon = ICON_RED
+            self._status_item.title = error_message or "Error checking repos"
+        elif any_new or self.has_new:
+            self.has_new = True
+            self.icon = ICON_HIGHLIGHT
+            self._status_item.title = "Last check: OK"
+        else:
+            self.icon = ICON_GRAY
+            self._status_item.title = "Last check: OK"
 
     def _tag_changed(self, key: str, result: dict) -> bool:
         prev = self.state.get(key)
@@ -184,7 +226,10 @@ class ReleaseWatcherApp(rumps.App):
         # Extract version from menu title (e.g., "Vinext: v2.3.1 (NEW)" -> "v2.3.1")
         title = sender.title
         version = title.split(": ", 1)[-1].replace(" (NEW)", "").strip()
-        subprocess.run(["pbcopy"], input=version.encode(), check=True)
+        try:
+            subprocess.run(["pbcopy"], input=version.encode(), check=True)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pass
 
         # Clear NEW marker
         if "(NEW)" in title:

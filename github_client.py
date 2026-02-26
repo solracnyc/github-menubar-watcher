@@ -4,6 +4,7 @@ import requests
 
 
 _BASE_URL = "https://api.github.com"
+_TIMEOUT = 30  # seconds
 
 
 class GitHubAPIError(Exception):
@@ -47,14 +48,21 @@ class GitHubClient:
 
     def _check_error(self, resp: requests.Response) -> None:
         if resp.status_code >= 400:
-            msg = resp.json().get("message", "Unknown error") if resp.content else "Unknown error"
+            msg = "Unknown error"
+            if resp.content:
+                try:
+                    msg = resp.json().get("message", "Unknown error")
+                except (ValueError, KeyError):
+                    msg = resp.text[:200] or "Unknown error"
             raise GitHubAPIError(resp.status_code, msg)
 
     def fetch_latest_tag(
         self, owner: str, repo: str, etag: str | None = None
     ) -> dict | None:
         url = f"{_BASE_URL}/repos/{owner}/{repo}/tags"
-        resp = requests.get(url, headers=self._build_headers(etag), params={"per_page": 1})
+        resp = requests.get(
+            url, headers=self._build_headers(etag), params={"per_page": 1}, timeout=_TIMEOUT,
+        )
 
         if resp.status_code == 304:
             return None
@@ -76,7 +84,7 @@ class GitHubClient:
         self, owner: str, repo: str, etag: str | None = None
     ) -> dict | None:
         url = f"{_BASE_URL}/repos/{owner}/{repo}/releases/latest"
-        resp = requests.get(url, headers=self._build_headers(etag))
+        resp = requests.get(url, headers=self._build_headers(etag), timeout=_TIMEOUT)
 
         if resp.status_code == 304:
             return None

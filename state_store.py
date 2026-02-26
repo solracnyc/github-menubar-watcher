@@ -2,6 +2,7 @@
 
 import json
 import os
+import tempfile
 from datetime import datetime, timezone
 
 
@@ -33,5 +34,12 @@ class StateStore:
         self._save()
 
     def _save(self) -> None:
-        with open(self.path, "w") as f:
-            json.dump(self.data, f, indent=2)
+        dir_name = os.path.dirname(self.path) or "."
+        fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump(self.data, f, indent=2)
+            os.replace(tmp_path, self.path)
+        except BaseException:
+            os.unlink(tmp_path)
+            raise

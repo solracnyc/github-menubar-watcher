@@ -103,3 +103,47 @@ class TestRateLimiting:
         mock_get.return_value = _mock_response(404, {"message": "Not Found"})
         with pytest.raises(GitHubAPIError, match="404"):
             client.fetch_latest_tag("x", "nonexistent")
+
+
+class TestNonJsonError:
+    @patch("github_client.requests.get")
+    def test_html_error_response(self, mock_get, client):
+        resp = MagicMock()
+        resp.status_code = 502
+        resp.content = b"<html>Bad Gateway</html>"
+        resp.json.side_effect = ValueError("No JSON")
+        resp.text = "<html>Bad Gateway</html>"
+        resp.headers = {}
+        mock_get.return_value = resp
+        with pytest.raises(GitHubAPIError, match="Bad Gateway"):
+            client.fetch_latest_tag("x", "y")
+
+    @patch("github_client.requests.get")
+    def test_empty_error_response(self, mock_get, client):
+        resp = MagicMock()
+        resp.status_code = 500
+        resp.content = b""
+        resp.headers = {}
+        mock_get.return_value = resp
+        with pytest.raises(GitHubAPIError, match="Unknown error"):
+            client.fetch_latest_tag("x", "y")
+
+
+class TestTimeout:
+    @patch("github_client.requests.get")
+    def test_tag_request_has_timeout(self, mock_get, client):
+        mock_get.return_value = _mock_response(200, [
+            {"name": "v1.0", "commit": {"sha": "abc"}}
+        ], {"ETag": '"e"'})
+        client.fetch_latest_tag("x", "y")
+        _, kwargs = mock_get.call_args
+        assert kwargs["timeout"] == 30
+
+    @patch("github_client.requests.get")
+    def test_release_request_has_timeout(self, mock_get, client):
+        mock_get.return_value = _mock_response(200, {
+            "id": 1, "tag_name": "v1.0", "name": "Release"
+        }, {"ETag": '"e"'})
+        client.fetch_latest_release("x", "y")
+        _, kwargs = mock_get.call_args
+        assert kwargs["timeout"] == 30

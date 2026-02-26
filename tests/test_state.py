@@ -46,3 +46,23 @@ def test_get_etag(tmp_path):
     assert store.get_etag("cloudflare/vinext") is None
     store.update("cloudflare/vinext", {"etag": '"abc"'})
     assert store.get_etag("cloudflare/vinext") == '"abc"'
+
+
+def test_atomic_write_no_temp_files_left(tmp_path):
+    """Atomic write should not leave .tmp files on success."""
+    p = tmp_path / "state.json"
+    store = StateStore(str(p))
+    store.update("test/repo", {"version": "v1.0"})
+    tmp_files = list(tmp_path.glob("*.tmp"))
+    assert tmp_files == []
+    assert p.exists()
+
+
+def test_state_survives_reload(tmp_path):
+    """Data written atomically should be loadable."""
+    p = tmp_path / "state.json"
+    store = StateStore(str(p))
+    store.update("test/repo", {"version": "v1.0", "etag": '"e"'})
+    store2 = StateStore(str(p))
+    assert store2.get("test/repo")["version"] == "v1.0"
+    assert store2.get_etag("test/repo") == '"e"'
