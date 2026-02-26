@@ -78,8 +78,19 @@ class ReleaseWatcherApp(rumps.App):
 
         # Set up periodic check timer using config interval
         interval = self.config.get("check_interval_minutes", 60) * 60
+        self._interval_seconds = interval
         self._timer = rumps.Timer(self._hourly_check, interval)
         self._timer.start()
+
+        # Pre-check flash timer: fires 2 min before each hourly check
+        if interval > 120:
+            self._pre_check_timer = rumps.Timer(self._pre_check_flash, interval)
+            # rumps.Timer doesn't support initial delay, so use threading.Timer
+            # for the offset, then start the recurring rumps.Timer
+            threading.Timer(
+                interval - 120,
+                lambda: callAfter(self._start_pre_check_timer),
+            ).start()
 
     def _version_display(self, state: dict | None, watch_type: str) -> str:
         if state is None:
@@ -242,6 +253,21 @@ class ReleaseWatcherApp(rumps.App):
         if generation != self._flash_generation:
             return
         self.icon = self._current_state_icon()
+
+    def _pre_check_flash(self, _):
+        """Flash icon green before scheduled check. Skipped for small intervals."""
+        if self._interval_seconds <= 120:
+            return
+        self._flash_generation += 1
+        gen = self._flash_generation
+        self.icon = ICON_GREEN
+        # 10-second revert via threading.Timer + callAfter for main thread
+        threading.Timer(10, lambda: callAfter(self._end_flash, gen)).start()
+
+    def _start_pre_check_timer(self):
+        """Start the recurring pre-check flash timer (called after initial offset)."""
+        self._pre_check_flash(None)  # Fire the first flash immediately
+        self._pre_check_timer.start()
 
     def _copy_version(self, sender):
         """Copy version string to clipboard when a repo menu item is clicked."""

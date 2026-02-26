@@ -11,6 +11,7 @@ class FakeApp:
         self._error_message = error_message
         self._flash_generation = 0
         self.icon = None
+        self._interval_seconds = 3600
 
     def _current_state_icon(self):
         if self._error_message:
@@ -23,6 +24,12 @@ class FakeApp:
         if generation != self._flash_generation:
             return  # Stale flash, ignore
         self.icon = self._current_state_icon()
+
+    def _pre_check_flash(self, _):
+        if self._interval_seconds <= 120:
+            return
+        self._flash_generation += 1
+        self.icon = ICON_GREEN
 
 
 def test_state_icon_idle():
@@ -61,3 +68,13 @@ def test_flash_end_noop_when_generation_stale():
     app.icon = "green"  # simulating flash state
     app._end_flash(1)  # stale generation
     assert app.icon == "green"  # unchanged
+
+
+def test_small_interval_skips_flash():
+    """Pre-check flash should be skipped when interval <= 120 seconds."""
+    app = FakeApp()
+    app._interval_seconds = 120
+    app.icon = ICON_GRAY
+    app._pre_check_flash(None)
+    assert app.icon == ICON_GRAY  # No change
+    assert app._flash_generation == 0  # Not incremented
