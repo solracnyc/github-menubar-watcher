@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.solrac.update-versions</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/solrac/Projects/Project update versions/.venv/bin/python</string>
+        <string>/Users/solrac/Projects/Project update versions/app.py</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/tmp/update-versions.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/update-versions.err</string>
+</dict>
+</plist>
