@@ -2,6 +2,9 @@
 __pycache__/
 *.pyc
 state.json
+state.json.corrupt-*
+config.json
+.DS_Store
 dist/
 build/
 *.egg-info/

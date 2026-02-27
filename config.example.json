@@ -1,0 +1,17 @@
+{
+  "check_interval_minutes": 60,
+  "repos": [
+    {
+      "owner": "torvalds",
+      "repo": "linux",
+      "watch": "tags",
+      "label": "Linux Kernel"
+    },
+    {
+      "owner": "nodejs",
+      "repo": "node",
+      "watch": "releases",
+      "label": "Node.js"
+    }
+  ]
+}

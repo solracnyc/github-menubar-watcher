@@ -27,7 +27,7 @@ ICON_GREEN = os.path.join(_DIR, "icons", "icon-green.png")
 
 class ReleaseWatcherApp(rumps.App):
     def __init__(self):
-        super().__init__("Release Watcher", icon=ICON_GRAY, quit_button=None)
+        super().__init__("GitHub Menubar Watcher", icon=ICON_GRAY, quit_button=None)
 
         # Load config
         try:

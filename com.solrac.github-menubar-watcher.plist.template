@@ -4,17 +4,17 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.solrac.update-versions</string>
+    <string>com.solrac.github-menubar-watcher</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/solrac/Projects/Project update versions/.venv/bin/python</string>
-        <string>/Users/solrac/Projects/Project update versions/app.py</string>
+        <string>__VENV_PYTHON__</string>
+        <string>__INSTALL_DIR__/app.py</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>/tmp/update-versions.log</string>
+    <string>/tmp/github-menubar-watcher.log</string>
     <key>StandardErrorPath</key>
-    <string>/tmp/update-versions.err</string>
+    <string>/tmp/github-menubar-watcher.err</string>
 </dict>
 </plist>
