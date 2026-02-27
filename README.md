@@ -14,7 +14,7 @@ A lightweight macOS menubar app that monitors GitHub repositories for new tags a
 - Native macOS notifications for new versions
 - Click any repo to copy the version string
 - Green flash before each scheduled check
-- Icon states: gray (idle), orange (new version), red (error)
+- Icon states: gray (idle), blue (new version), red (error)
 - Runs at login via LaunchAgent
 - Works with or without a GitHub token (token increases rate limit)
 
@@ -84,7 +84,7 @@ Or set the `GITHUB_TOKEN` environment variable.
 | Icon | Meaning |
 |------|---------|
 | Gray | Idle — all repos up to date |
-| Orange | New version detected — click a repo to dismiss |
+| Blue | New version detected — click a repo to dismiss |
 | Red | Error — check the menu for details |
 | Green (flash) | Pre-check indicator — scheduled check in ~2 min |
 

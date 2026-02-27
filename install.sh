@@ -15,7 +15,7 @@ for candidate in python3 python; do
         version=$("$candidate" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
         major=$(echo "$version" | cut -d. -f1)
         minor=$(echo "$version" | cut -d. -f2)
-        if [[ "$major" -ge 3 && "$minor" -ge 10 ]]; then
+        if [[ "$major" -gt 3 || ( "$major" -eq 3 && "$minor" -ge 10 ) ]]; then
             PYTHON="$candidate"
             break
         fi
@@ -44,13 +44,18 @@ if [[ ! -f "$INSTALL_DIR/config.json" ]]; then
     echo "Edit config.json to add your repos, then re-run this script."
 fi
 
-# ── Generate plist (Python handles paths with spaces safely) ─────────
+# ── Generate plist (env vars avoid quoting issues with special paths) ─
 mkdir -p "$HOME/Library/LaunchAgents"
+PLIST_TEMPLATE="$PLIST_TEMPLATE" \
+INSTALL_DIR="$INSTALL_DIR" \
+VENV_PYTHON="$VENV_PYTHON" \
+PLIST_DEST="$PLIST_DEST" \
 "$VENV_PYTHON" -c "
-template = open('$PLIST_TEMPLATE').read()
-template = template.replace('__INSTALL_DIR__', '$INSTALL_DIR')
-template = template.replace('__VENV_PYTHON__', '$VENV_PYTHON')
-open('$PLIST_DEST', 'w').write(template)
+import os
+template = open(os.environ['PLIST_TEMPLATE']).read()
+template = template.replace('__INSTALL_DIR__', os.environ['INSTALL_DIR'])
+template = template.replace('__VENV_PYTHON__', os.environ['VENV_PYTHON'])
+open(os.environ['PLIST_DEST'], 'w').write(template)
 "
 echo "Generated $PLIST_DEST"
 
